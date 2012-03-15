@@ -3,7 +3,7 @@
 
 typedef boost::variant<int, char> IntChar;
 
-int main() {
+int main(int, char**) {
     IntChar v('a');
     // v = 3;
     int ret = boost::apply_visitor(make_visitor(
@@ -16,4 +16,6 @@ int main() {
             return 2;
         }), v);
     std::cout << ret << std::endl;
+
+    return 0;
 }
