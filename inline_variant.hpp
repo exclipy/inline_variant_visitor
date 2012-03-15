@@ -16,6 +16,7 @@
 #include <boost/move/move.hpp>
 #include <boost/fusion/include/map.hpp>
 #include <boost/fusion/include/make_vector.hpp>
+#include <boost/fusion/include/has_key.hpp>
 #include <boost/fusion/include/at_key.hpp>
 #include <boost/fusion/algorithm/transformation/transform.hpp>
 #include <utility>
@@ -27,6 +28,7 @@ struct function_arg_extractor
 	template <typename FunctionType>
 	struct apply
 	{
+	private:
 		typedef typename boost::remove_const< typename boost::remove_reference<FunctionType>::type >::type bare_type;
 		typedef typename signature_of<bare_type>::type normalized_function_type;
 		typedef typename boost::function_types::function_arity<normalized_function_type>::type arity;
@@ -36,14 +38,24 @@ struct function_arg_extractor
 		BOOST_STATIC_ASSERT((arity::value == 1));
 
 		typedef typename boost::mpl::front<parameter_types>::type parameter_type;
+	public:
 		typedef typename boost::remove_const< typename boost::remove_reference<parameter_type>::type >::type type;
 	};
 };
 
 template <typename FunctionTypes>
-struct get_function_args :
-	boost::mpl::transform<FunctionTypes, function_arg_extractor>
+struct get_functions_args : boost::mpl::transform<FunctionTypes, function_arg_extractor>
 {
+};
+
+template <typename FunctionType>
+struct get_function_return
+{
+private:
+	typedef typename boost::remove_const< typename boost::remove_reference<FunctionType>::type >::type bare_type;
+	typedef typename signature_of<bare_type>::type normalized_function_type;
+public:
+	typedef typename boost::function_types::result_type<normalized_function_type>::type type;
 };
 
 struct pair_maker
@@ -68,8 +80,9 @@ struct pair_maker
 template <typename ReturnType, typename... FunctionTypes >
 struct generic_visitor : boost::static_visitor<ReturnType>
 {
+private:
 	typedef boost::mpl::vector<FunctionTypes...> function_types;
-	typedef typename get_function_args<function_types>::type variant_types;
+	typedef typename get_functions_args<function_types>::type variant_types;
 	typedef typename boost::mpl::transform<
 		variant_types,
 		function_types,
@@ -78,6 +91,7 @@ struct generic_visitor : boost::static_visitor<ReturnType>
 
 	function_map fmap;
 
+public:
 	generic_visitor(FunctionTypes... functions)
 	:
 		fmap(boost::fusion::as_map(boost::fusion::transform(boost::fusion::make_vector(functions...), pair_maker())))
@@ -88,11 +102,23 @@ struct generic_visitor : boost::static_visitor<ReturnType>
 	ReturnType operator()(T object) const {
 		typedef typename boost::remove_const< typename boost::remove_reference<T>::type >::type bare_type;
 		BOOST_STATIC_ASSERT((boost::mpl::contains<variant_types, bare_type>::type::value ));
+		BOOST_STATIC_ASSERT((boost::fusion::result_of::has_key<function_map, T>::value));
 		return boost::fusion::at_key<T>(fmap)(object);
 	}
 };
 
-template <typename ReturnType, typename... FunctionTypes>
-auto make_visitor(FunctionTypes... functions) -> generic_visitor< ReturnType, FunctionTypes... > {
-	return generic_visitor< ReturnType, FunctionTypes... >(boost::forward<FunctionTypes>(functions)...);
+template <typename... FunctionTypes>
+struct get_generic_visitor_type
+{
+private:
+	typedef boost::mpl::vector<FunctionTypes...> function_types;
+	BOOST_STATIC_ASSERT((boost::mpl::size<function_types>::value > 0));
+	typedef typename get_function_return<typename boost::mpl::front<function_types>::type>::type result_type;
+public:
+	typedef generic_visitor<result_type, FunctionTypes...> type;
+};
+
+template <typename... FunctionTypes>
+auto make_visitor(FunctionTypes... functions) -> typename get_generic_visitor_type<FunctionTypes...>::type {
+	return typename get_generic_visitor_type<FunctionTypes...>::type(functions...);
 }

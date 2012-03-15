@@ -5,8 +5,8 @@ typedef boost::variant<int, char> IntChar;
 
 int main() {
     IntChar v('a');
-    //v = 3;
-    int ret = boost::apply_visitor(make_visitor<int>(
+    // v = 3;
+    int ret = boost::apply_visitor(make_visitor(
         [](int x) {
             std::cout << "int " << x << std::endl;
             return 1;
