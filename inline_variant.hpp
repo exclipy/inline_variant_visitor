@@ -1,4 +1,3 @@
-#include <boost/variant.hpp>
 #include <typeinfo>
 #include <iostream>
 #include <boost/mpl/vector.hpp>
@@ -22,8 +21,6 @@
 #include <utility>
 
 #include "function_signature.hpp"
-
-typedef boost::variant<int, char> IntChar;
 
 struct function_arg_extractor
 {
@@ -98,27 +95,4 @@ struct generic_visitor : boost::static_visitor<ReturnType>
 template <typename ReturnType, typename... FunctionTypes>
 auto make_visitor(FunctionTypes... functions) -> generic_visitor< ReturnType, FunctionTypes... > {
 	return generic_visitor< ReturnType, FunctionTypes... >(boost::forward<FunctionTypes>(functions)...);
-}
-
-struct Func1
-{
-	int operator()(int x) const {
-        std::cout << "int " << x << std::endl;
-        return 1;
-	}
-};
-
-struct Func2
-{
-	int operator()(char x) const {
-        std::cout << "char " << x << std::endl;
-        return 2;
-	}
-};
-
-int main() {
-    IntChar v('a');
-    //v = 3;
-    int ret = boost::apply_visitor(make_visitor<int>(Func1(), Func2()), v);
-    std::cout << ret << std::endl;
 }
