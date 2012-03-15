@@ -17,6 +17,7 @@
 #include <boost/move/move.hpp>
 #include <boost/fusion/include/map.hpp>
 #include <boost/fusion/include/make_vector.hpp>
+#include <boost/fusion/include/at_key.hpp>
 #include <boost/fusion/algorithm/transformation/transform.hpp>
 #include <utility>
 
@@ -29,13 +30,13 @@ struct function_arg_extractor
 	template <typename FunctionType>
 	struct apply
 	{
-		typedef typename signature_of<FunctionType>::type RealFunctionType;
-		typedef typename boost::function_types::function_arity<RealFunctionType>::type arity;
-		typedef typename boost::function_types::parameter_types<RealFunctionType>::type parameter_types;
-		typedef typename boost::function_types::result_type<RealFunctionType>::type result_type;
+		typedef typename boost::remove_const< typename boost::remove_reference<FunctionType>::type >::type bare_type;
+		typedef typename signature_of<bare_type>::type normalized_function_type;
+		typedef typename boost::function_types::function_arity<normalized_function_type>::type arity;
+		typedef typename boost::function_types::parameter_types<normalized_function_type>::type parameter_types;
+		typedef typename boost::function_types::result_type<normalized_function_type>::type result_type;
 
 		BOOST_STATIC_ASSERT((arity::value == 1));
-		BOOST_STATIC_ASSERT((boost::is_same< result_type, void >::value));
 
 		typedef typename boost::mpl::front<parameter_types>::type parameter_type;
 		typedef typename boost::remove_const< typename boost::remove_reference<parameter_type>::type >::type type;
@@ -57,7 +58,7 @@ struct pair_maker
     struct result<pair_maker(FunctionType)>
     {
 		typedef typename function_arg_extractor::apply<FunctionType>::type arg_type;
-		typedef typename boost::fusion::result_of::make_pair<arg_type, FunctionType>::type type;
+		typedef boost::fusion::pair<arg_type, FunctionType> type;
     };
 
     template <typename FunctionType>
@@ -78,40 +79,46 @@ struct generic_visitor : boost::static_visitor<ReturnType>
 		boost::fusion::result_of::make_pair<boost::mpl::_1, boost::mpl::_2> >::type pair_list;
 	typedef typename boost::fusion::result_of::as_map<pair_list>::type function_map;
 
-	generic_visitor(FunctionTypes&&... functions)
+	function_map fmap;
+
+	generic_visitor(FunctionTypes... functions)
+	:
+		fmap(boost::fusion::as_map(boost::fusion::transform(boost::fusion::make_vector(functions...), pair_maker())))
 	{
-		boost::fusion::transform(boost::fusion::make_vector(functions...), pair_maker());
 	}
 
 	template <typename T>
-	ReturnType operator()(T&& object) const {
+	ReturnType operator()(T object) const {
 		typedef typename boost::remove_const< typename boost::remove_reference<T>::type >::type bare_type;
 		BOOST_STATIC_ASSERT((boost::mpl::contains<variant_types, bare_type>::type::value ));
-		std::cout << typeid(T).name() << std::endl;
+		return boost::fusion::at_key<T>(fmap)(object);
 	}
 };
 
 template <typename ReturnType, typename... FunctionTypes>
-auto make_visitor(FunctionTypes&&... functions) -> generic_visitor< ReturnType, FunctionTypes... > {
+auto make_visitor(FunctionTypes... functions) -> generic_visitor< ReturnType, FunctionTypes... > {
 	return generic_visitor< ReturnType, FunctionTypes... >(boost::forward<FunctionTypes>(functions)...);
 }
 
 struct Func1
 {
-	void operator()(int x) {
+	int operator()(int x) const {
         std::cout << "int " << x << std::endl;
+        return 1;
 	}
 };
 
 struct Func2
 {
-	void operator()(char x) {
+	int operator()(char x) const {
         std::cout << "char " << x << std::endl;
+        return 2;
 	}
 };
 
 int main() {
     IntChar v('a');
     //v = 3;
-    boost::apply_visitor(make_visitor<void>(Func1(), Func2()), v);
+    int ret = boost::apply_visitor(make_visitor<int>(Func1(), Func2()), v);
+    std::cout << ret << std::endl;
 }
