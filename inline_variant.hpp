@@ -6,6 +6,7 @@
 #include <boost/mpl/front.hpp>
 #include <boost/mpl/contains.hpp>
 #include <boost/mpl/transform.hpp>
+#include <boost/mpl/pop_front.hpp>
 #include <boost/type_traits/is_same.hpp>
 #include <boost/type_traits/remove_reference.hpp>
 #include <boost/static_assert.hpp>
@@ -22,8 +23,11 @@
 
 #include "function_signature.hpp"
 
+// A metafunction class for getting the argument type from a unary function or functor type
 struct function_arg_extractor
 {
+    // FunctionType is either a function type like void(int const&), or a functor - eg. a class with void operator(int)
+    // Sets type to the argument type with the constness and referenceness stripped (eg. int)
     template <typename FunctionType>
     struct apply
     {
@@ -42,52 +46,50 @@ struct function_arg_extractor
     };
 };
 
-template <typename FunctionTypes>
-struct get_functions_args : boost::mpl::transform<FunctionTypes, function_arg_extractor>
+// A metafunction class for getting the return type of a function
+struct function_return_extractor
 {
-};
-
-template <typename FunctionType>
-struct get_function_return
-{
-private:
-    typedef typename boost::remove_const< typename boost::remove_reference<FunctionType>::type >::type bare_type;
-    typedef typename signature_of<bare_type>::type normalized_function_type;
-public:
-    typedef typename boost::function_types::result_type<normalized_function_type>::type type;
-};
-
-struct pair_maker
-{
-    template<typename Sig>
-    struct result;
-
     template <typename FunctionType>
-    struct result<pair_maker(FunctionType)>
+    struct apply : boost::function_types::result_type<typename signature_of<FunctionType>::type>
     {
-        typedef typename function_arg_extractor::apply<FunctionType>::type arg_type;
-        typedef boost::fusion::pair<arg_type, FunctionType> type;
     };
-
-    template <typename FunctionType>
-    typename result<pair_maker(FunctionType)>::type operator()(FunctionType a) const
-    {
-        return boost::fusion::make_pair< typename result<pair_maker(FunctionType)>::arg_type >(a);
-    }
 };
 
+// A functor template suitable for passing into apply_visitor.  The constructor accepts the list of handler functions,
+// which are then exposed through a set of operator()s
 template <typename ReturnType, typename... FunctionTypes >
 struct generic_visitor : boost::static_visitor<ReturnType>
 {
 private:
     typedef boost::mpl::vector<FunctionTypes...> function_types;
-    typedef typename get_functions_args<function_types>::type variant_types;
+    typedef typename boost::mpl::transform<function_types, function_arg_extractor>::type variant_types;
     typedef typename boost::mpl::transform<
         variant_types,
         function_types,
         boost::fusion::result_of::make_pair<boost::mpl::_1, boost::mpl::_2> >::type pair_list;
     typedef typename boost::fusion::result_of::as_map<pair_list>::type function_map;
 
+    // A private helper fusion metafunction to construct a fusion map of functions
+    struct pair_maker
+    {
+        template<typename Sig>
+        struct result;
+
+        template <typename FunctionType>
+        struct result<pair_maker(FunctionType)>
+        {
+            typedef typename function_arg_extractor::apply<FunctionType>::type arg_type;
+            typedef boost::fusion::pair<arg_type, FunctionType> type;
+        };
+
+        template <typename FunctionType>
+        typename result<pair_maker(FunctionType)>::type operator()(FunctionType a) const
+        {
+            return boost::fusion::make_pair< typename result<pair_maker(FunctionType)>::arg_type >(a);
+        }
+    };
+
+    // Maps from argument type to the runtime function object that can deal with it
     function_map fmap;
 
 public:
@@ -108,6 +110,7 @@ public:
     }
 };
 
+// A metafunction for getting the required generic_visitor type for the set of FunctionTypes
 template <typename... FunctionTypes>
 struct get_generic_visitor_type
 {
@@ -115,7 +118,26 @@ private:
     typedef boost::mpl::vector<FunctionTypes...> function_types;
     BOOST_STATIC_ASSERT_MSG((boost::mpl::size<function_types>::value > 0),
             "make_visitor called with no functions");
-    typedef typename get_function_return<typename boost::mpl::front<function_types>::type>::type result_type;
+    typedef typename boost::mpl::transform<function_types, function_return_extractor>::type return_types;
+
+    // Set result_type to the return type of the first function
+    typedef typename boost::mpl::front<return_types>::type result_type;
+
+    // Check that all functions return result_type
+    // A metafunction class that asserts the two arguments are the same and returns the first one
+    struct check_same
+    {
+        template <typename Type1, typename Type2>
+        struct apply
+        {
+        private:
+            BOOST_STATIC_ASSERT_MSG((boost::is_same<Type1, Type2>::type::value),
+                    "make_visitor called with functions of differing return types");
+        public:
+            typedef Type1 type;
+        };
+    };
+    typedef typename boost::mpl::fold<return_types, result_type, check_same>::type dummy;
 public:
     typedef generic_visitor<result_type, FunctionTypes...> type;
 };
