@@ -117,7 +117,6 @@ struct function_return_extractor
     };
 };
 
-// Check that all functions return result_type
 // A metafunction class that asserts the two arguments are the same and returns the first one
 struct check_same
 {
