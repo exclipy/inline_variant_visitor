@@ -1,4 +1,3 @@
-#include <typeinfo>
 #include <boost/mpl/vector.hpp>
 #include <boost/mpl/transform.hpp>
 #include <boost/mpl/equal_to.hpp>
@@ -23,6 +22,8 @@
 
 #include "function_signature.hpp"
 
+namespace detail {
+
 // A metafunction class for getting the argument type from a unary function or functor type
 struct function_arg_extractor
 {
@@ -46,13 +47,24 @@ struct function_arg_extractor
     };
 };
 
-// A metafunction class for getting the return type of a function
-struct function_return_extractor
+// A private helper fusion metafunction to construct a fusion map of functions
+struct pair_maker
 {
+    template<typename Sig>
+    struct result;
+
     template <typename FunctionType>
-    struct apply : boost::function_types::result_type<typename signature_of<FunctionType>::type>
+    struct result<pair_maker(FunctionType)>
     {
+        typedef typename function_arg_extractor::apply<FunctionType>::type arg_type;
+        typedef boost::fusion::pair<arg_type, FunctionType> type;
     };
+
+    template <typename FunctionType>
+    typename result<pair_maker(FunctionType)>::type operator()(FunctionType a) const
+    {
+        return boost::fusion::make_pair< typename result<pair_maker(FunctionType)>::arg_type >(a);
+    }
 };
 
 // A functor template suitable for passing into apply_visitor.  The constructor accepts the list of handler functions,
@@ -61,6 +73,7 @@ template <typename ReturnType, typename... FunctionTypes >
 struct generic_visitor : boost::static_visitor<ReturnType>
 {
 private:
+    // Compute the function_map type
     typedef boost::mpl::vector<FunctionTypes...> function_types;
     typedef typename boost::mpl::transform<function_types, function_arg_extractor>::type variant_types;
     typedef typename boost::mpl::transform<
@@ -68,26 +81,6 @@ private:
         function_types,
         boost::fusion::result_of::make_pair<boost::mpl::_1, boost::mpl::_2> >::type pair_list;
     typedef typename boost::fusion::result_of::as_map<pair_list>::type function_map;
-
-    // A private helper fusion metafunction to construct a fusion map of functions
-    struct pair_maker
-    {
-        template<typename Sig>
-        struct result;
-
-        template <typename FunctionType>
-        struct result<pair_maker(FunctionType)>
-        {
-            typedef typename function_arg_extractor::apply<FunctionType>::type arg_type;
-            typedef boost::fusion::pair<arg_type, FunctionType> type;
-        };
-
-        template <typename FunctionType>
-        typename result<pair_maker(FunctionType)>::type operator()(FunctionType a) const
-        {
-            return boost::fusion::make_pair< typename result<pair_maker(FunctionType)>::arg_type >(a);
-        }
-    };
 
     // Maps from argument type to the runtime function object that can deal with it
     function_map fmap;
@@ -102,12 +95,34 @@ public:
     template <typename T>
     ReturnType operator()(T object) const {
         typedef typename boost::remove_const< typename boost::remove_reference<T>::type >::type bare_type;
-        BOOST_STATIC_ASSERT_MSG((boost::mpl::contains<variant_types, bare_type>::type::value),
-                "make_visitor called without specifying handlers for all required types");
         BOOST_STATIC_ASSERT_MSG((boost::fusion::result_of::has_key<function_map, T>::value),
                 "make_visitor called without specifying handlers for all required types");
         return boost::fusion::at_key<T>(fmap)(object);
     }
+};
+
+// A metafunction class for getting the return type of a function
+struct function_return_extractor
+{
+    template <typename FunctionType>
+    struct apply : boost::function_types::result_type<typename signature_of<FunctionType>::type>
+    {
+    };
+};
+
+// Check that all functions return result_type
+// A metafunction class that asserts the two arguments are the same and returns the first one
+struct check_same
+{
+    template <typename Type1, typename Type2>
+    struct apply
+    {
+    private:
+        BOOST_STATIC_ASSERT_MSG((boost::is_same<Type1, Type2>::type::value),
+                "make_visitor called with functions of differing return types");
+    public:
+        typedef Type1 type;
+    };
 };
 
 // A metafunction for getting the required generic_visitor type for the set of FunctionTypes
@@ -123,26 +138,14 @@ private:
     // Set result_type to the return type of the first function
     typedef typename boost::mpl::front<return_types>::type result_type;
 
-    // Check that all functions return result_type
-    // A metafunction class that asserts the two arguments are the same and returns the first one
-    struct check_same
-    {
-        template <typename Type1, typename Type2>
-        struct apply
-        {
-        private:
-            BOOST_STATIC_ASSERT_MSG((boost::is_same<Type1, Type2>::type::value),
-                    "make_visitor called with functions of differing return types");
-        public:
-            typedef Type1 type;
-        };
-    };
     typedef typename boost::mpl::fold<return_types, result_type, check_same>::type dummy;
 public:
     typedef generic_visitor<result_type, FunctionTypes...> type;
 };
 
+}
+
 template <typename... FunctionTypes>
-auto make_visitor(FunctionTypes... functions) -> typename get_generic_visitor_type<FunctionTypes...>::type {
-    return typename get_generic_visitor_type<FunctionTypes...>::type(functions...);
+auto make_visitor(FunctionTypes... functions) -> typename detail::get_generic_visitor_type<FunctionTypes...>::type {
+    return typename detail::get_generic_visitor_type<FunctionTypes...>::type(functions...);
 }
