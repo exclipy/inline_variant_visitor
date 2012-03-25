@@ -1,24 +1,22 @@
-#include <boost/mpl/vector.hpp>
-#include <boost/mpl/transform.hpp>
-#include <boost/mpl/equal_to.hpp>
-#include <boost/mpl/size.hpp>
-#include <boost/mpl/front.hpp>
-#include <boost/mpl/contains.hpp>
-#include <boost/mpl/transform.hpp>
-#include <boost/mpl/pop_front.hpp>
-#include <boost/type_traits/is_same.hpp>
-#include <boost/type_traits/remove_reference.hpp>
-#include <boost/static_assert.hpp>
 #include <boost/function_types/function_arity.hpp>
 #include <boost/function_types/parameter_types.hpp>
 #include <boost/function_types/result_type.hpp>
-#include <boost/move/move.hpp>
-#include <boost/fusion/include/map.hpp>
-#include <boost/fusion/include/make_vector.hpp>
-#include <boost/fusion/include/has_key.hpp>
 #include <boost/fusion/include/at_key.hpp>
+#include <boost/fusion/include/has_key.hpp>
+#include <boost/fusion/include/make_vector.hpp>
+#include <boost/fusion/include/map.hpp>
 #include <boost/fusion/algorithm/transformation/transform.hpp>
-#include <utility>
+#include <boost/mpl/contains.hpp>
+#include <boost/mpl/equal_to.hpp>
+#include <boost/mpl/front.hpp>
+#include <boost/mpl/pop_front.hpp>
+#include <boost/mpl/set.hpp>
+#include <boost/mpl/size.hpp>
+#include <boost/mpl/transform.hpp>
+#include <boost/mpl/vector.hpp>
+#include <boost/static_assert.hpp>
+#include <boost/type_traits/is_same.hpp>
+#include <boost/type_traits/remove_reference.hpp>
 
 #include "function_signature.hpp"
 
@@ -76,10 +74,19 @@ private:
     // Compute the function_map type
     typedef boost::mpl::vector<FunctionTypes...> function_types;
     typedef typename boost::mpl::transform<function_types, function_arg_extractor>::type variant_types;
+    // Check that the argument types are unique
+    typedef typename boost::mpl::fold<
+        variant_types,
+        boost::mpl::set0<>,
+        boost::mpl::insert<boost::mpl::_1,boost::mpl::_2>
+    >::type variant_types_set;
+    BOOST_STATIC_ASSERT_MSG((boost::mpl::size<variant_types_set>::type::value == boost::mpl::size<variant_types>::value),
+            "make_visitor called with non-unique argument types for handler functions");
     typedef typename boost::mpl::transform<
         variant_types,
         function_types,
-        boost::fusion::result_of::make_pair<boost::mpl::_1, boost::mpl::_2> >::type pair_list;
+        boost::fusion::result_of::make_pair<boost::mpl::_1, boost::mpl::_2>
+    >::type pair_list;
     typedef typename boost::fusion::result_of::as_map<pair_list>::type function_map;
 
     // Maps from argument type to the runtime function object that can deal with it
