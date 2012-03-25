@@ -80,7 +80,7 @@ private:
         boost::mpl::set0<>,
         boost::mpl::insert<boost::mpl::_1,boost::mpl::_2>
     >::type variant_types_set;
-    BOOST_STATIC_ASSERT_MSG((boost::mpl::size<variant_types_set>::type::value == boost::mpl::size<variant_types>::value),
+    BOOST_STATIC_ASSERT_MSG((boost::mpl::size<variant_types_set>::value == boost::mpl::size<variant_types>::value),
             "make_visitor called with non-unique argument types for handler functions");
     typedef typename boost::mpl::transform<
         variant_types,
@@ -125,7 +125,7 @@ struct check_same
     struct apply
     {
     private:
-        BOOST_STATIC_ASSERT_MSG((boost::is_same<Type1, Type2>::type::value),
+        BOOST_STATIC_ASSERT_MSG((boost::is_same<Type1, Type2>::value),
                 "make_visitor called with functions of differing return types");
     public:
         typedef Type1 type;
@@ -145,6 +145,7 @@ private:
     // Set result_type to the return type of the first function
     typedef typename boost::mpl::front<return_types>::type result_type;
 
+    // Assert that every return type is the same as the first one
     typedef typename boost::mpl::fold<return_types, result_type, check_same>::type dummy;
 public:
     typedef generic_visitor<result_type, FunctionTypes...> type;
