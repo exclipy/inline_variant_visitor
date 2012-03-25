@@ -34,7 +34,7 @@ struct function_arg_extractor
         typedef typename boost::function_types::parameter_types<normalized_function_type>::type parameter_types;
         typedef typename boost::function_types::result_type<normalized_function_type>::type result_type;
 
-        BOOST_STATIC_ASSERT((arity::value == 1));
+        BOOST_STATIC_ASSERT_MSG((arity::value == 1), "make_visitor called with a non-unary function");
 
         typedef typename boost::mpl::front<parameter_types>::type parameter_type;
     public:
@@ -100,8 +100,10 @@ public:
     template <typename T>
     ReturnType operator()(T object) const {
         typedef typename boost::remove_const< typename boost::remove_reference<T>::type >::type bare_type;
-        BOOST_STATIC_ASSERT((boost::mpl::contains<variant_types, bare_type>::type::value ));
-        BOOST_STATIC_ASSERT((boost::fusion::result_of::has_key<function_map, T>::value));
+        BOOST_STATIC_ASSERT_MSG((boost::mpl::contains<variant_types, bare_type>::type::value),
+                "make_visitor called without specifying handlers for all required types");
+        BOOST_STATIC_ASSERT_MSG((boost::fusion::result_of::has_key<function_map, T>::value),
+                "make_visitor called without specifying handlers for all required types");
         return boost::fusion::at_key<T>(fmap)(object);
     }
 };
@@ -111,7 +113,8 @@ struct get_generic_visitor_type
 {
 private:
     typedef boost::mpl::vector<FunctionTypes...> function_types;
-    BOOST_STATIC_ASSERT((boost::mpl::size<function_types>::value > 0));
+    BOOST_STATIC_ASSERT_MSG((boost::mpl::size<function_types>::value > 0),
+            "make_visitor called with no functions");
     typedef typename get_function_return<typename boost::mpl::front<function_types>::type>::type result_type;
 public:
     typedef generic_visitor<result_type, FunctionTypes...> type;
