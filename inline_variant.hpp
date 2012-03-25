@@ -1,5 +1,4 @@
 #include <typeinfo>
-#include <iostream>
 #include <boost/mpl/vector.hpp>
 #include <boost/mpl/transform.hpp>
 #include <boost/mpl/equal_to.hpp>

@@ -1,21 +1,24 @@
 #include <boost/variant.hpp>
+#define BOOST_TEST_MODULE MyTest
+#define BOOST_TEST_DYN_LINK
+#include <boost/test/unit_test.hpp>
+
 #include "inline_variant.hpp"
 
 typedef boost::variant<int, char> IntChar;
 
-int main(int, char**) {
-    IntChar v('a');
-    // v = 3;
+int run_visitor(const IntChar& variant)
+{
     int ret = boost::apply_visitor(make_visitor(
-        [](int x) {
-            std::cout << "int " << x << std::endl;
-            return 1;
-        },
-        [](char x) {
-            std::cout << "char " << x << std::endl;
-            return 2;
-        }), v);
-    std::cout << ret << std::endl;
+        [](int x) { return static_cast<int>(x); },
+        [](char x) { return static_cast<int>(x) + 3; }),
+        variant);
+    return ret;
+}
 
-    return 0;
+BOOST_AUTO_TEST_CASE(visit_primitives) {
+    IntChar v(123);
+    BOOST_CHECK_EQUAL(run_visitor(v), 123);
+    v = 'c';
+    BOOST_CHECK_EQUAL(run_visitor(v), static_cast<int>('c')+3);
 }
