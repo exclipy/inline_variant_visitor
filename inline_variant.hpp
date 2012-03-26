@@ -141,18 +141,27 @@ private:
             "make_visitor called with no functions");
     typedef typename boost::mpl::transform<function_types, function_return_extractor>::type return_types;
 
+public:
     // Set result_type to the return type of the first function
     typedef typename boost::mpl::front<return_types>::type result_type;
 
+    typedef generic_visitor<result_type, FunctionTypes...> type;
+
+private:
     // Assert that every return type is the same as the first one
     typedef typename boost::mpl::fold<return_types, result_type, check_same>::type dummy;
-public:
-    typedef generic_visitor<result_type, FunctionTypes...> type;
 };
 
-}
 
 template <typename... FunctionTypes>
 auto make_visitor(FunctionTypes... functions) -> typename detail::get_generic_visitor_type<FunctionTypes...>::type {
     return typename detail::get_generic_visitor_type<FunctionTypes...>::type(functions...);
+}
+
+}
+
+template <typename Variant, typename... FunctionTypes>
+auto match(Variant const& variant, FunctionTypes... functions) -> typename detail::get_generic_visitor_type<FunctionTypes...>::result_type
+{
+    return boost::apply_visitor(detail::make_visitor(functions...), variant);
 }

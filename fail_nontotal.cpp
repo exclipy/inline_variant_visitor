@@ -6,8 +6,7 @@ typedef boost::variant<int, char> IntChar;
 
 int main(int, char**) {
     IntChar v(123);
-    int ret = boost::apply_visitor(make_visitor(
-        [](int x) { return 0; }),
-        v);
+    int ret = match(v,
+        [](int x) { return 0; });
     return 0;
 }

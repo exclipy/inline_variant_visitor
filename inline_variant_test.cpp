@@ -9,10 +9,9 @@ typedef boost::variant<int, char> IntChar;
 
 int run_visitor(const IntChar& variant)
 {
-    int ret = boost::apply_visitor(make_visitor(
+    int ret = match(variant,
         [](int x) { return static_cast<int>(x); },
-        [](char x) { return static_cast<int>(x) + 3; }),
-        variant);
+        [](char x) { return static_cast<int>(x) + 3; });
     return ret;
 }
 
