@@ -132,6 +132,7 @@ struct check_same
     };
 };
 
+// A metafunction template helper
 template <typename ResultType>
 struct expand_generic_visitor
 {
@@ -150,13 +151,19 @@ private:
     typedef boost::mpl::vector<FunctionTypes...> function_types;
     BOOST_STATIC_ASSERT_MSG((boost::mpl::size<function_types>::value > 0),
             "make_visitor called with no functions");
-    typedef typename boost::mpl::transform<function_types, function_return_extractor>::type return_types;
+    typedef typename boost::mpl::transform<
+        function_types,
+        boost::remove_const< boost::remove_reference<boost::mpl::_1> >
+    >::type bare_function_types;
+    typedef typename boost::mpl::transform<bare_function_types, function_return_extractor>::type return_types;
 
 public:
     // Set result_type to the return type of the first function
     typedef typename boost::mpl::front<return_types>::type result_type;
 
-    typedef typename boost::mpl::unpack_args< expand_generic_visitor<result_type> >::template apply<function_types>::type type;
+    typedef typename boost::mpl::unpack_args<
+        expand_generic_visitor<result_type>
+    >::template apply<bare_function_types>::type type;
 
 private:
     // Assert that every return type is the same as the first one
