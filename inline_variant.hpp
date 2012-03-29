@@ -152,7 +152,7 @@ private:
     typedef typename boost::mpl::fold<return_types, result_type, check_same>::type dummy;
 };
 
-
+// Accepts a set of functions and returns an object suitable for apply_visitor
 template <typename... FunctionTypes>
 auto make_visitor(FunctionTypes... functions) -> typename detail::get_generic_visitor_type<FunctionTypes...>::type {
     return typename detail::get_generic_visitor_type<FunctionTypes...>::type(functions...);
