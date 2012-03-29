@@ -13,6 +13,7 @@
 #include <boost/mpl/set.hpp>
 #include <boost/mpl/size.hpp>
 #include <boost/mpl/transform.hpp>
+#include <boost/mpl/unpack_args.hpp>
 #include <boost/mpl/vector.hpp>
 #include <boost/static_assert.hpp>
 #include <boost/type_traits/is_same.hpp>
@@ -131,9 +132,19 @@ struct check_same
     };
 };
 
+template <typename ResultType>
+struct expand_generic_visitor
+{
+    template <typename... FunctionTypes>
+    struct apply
+    {
+        typedef generic_visitor<ResultType, FunctionTypes...> type;
+    };
+};
+
 // A metafunction for getting the required generic_visitor type for the set of FunctionTypes
 template <typename... FunctionTypes>
-struct get_generic_visitor_type
+struct get_generic_visitor
 {
 private:
     typedef boost::mpl::vector<FunctionTypes...> function_types;
@@ -145,7 +156,7 @@ public:
     // Set result_type to the return type of the first function
     typedef typename boost::mpl::front<return_types>::type result_type;
 
-    typedef generic_visitor<result_type, FunctionTypes...> type;
+    typedef typename boost::mpl::unpack_args< expand_generic_visitor<result_type> >::template apply<function_types>::type type;
 
 private:
     // Assert that every return type is the same as the first one
@@ -154,14 +165,14 @@ private:
 
 // Accepts a set of functions and returns an object suitable for apply_visitor
 template <typename... FunctionTypes>
-auto make_visitor(FunctionTypes... functions) -> typename detail::get_generic_visitor_type<FunctionTypes...>::type {
-    return typename detail::get_generic_visitor_type<FunctionTypes...>::type(functions...);
+auto make_visitor(FunctionTypes... functions) -> typename detail::get_generic_visitor<FunctionTypes...>::type {
+    return typename detail::get_generic_visitor<FunctionTypes...>::type(functions...);
 }
 
 }
 
 template <typename Variant, typename... FunctionTypes>
-auto match(Variant const& variant, FunctionTypes... functions) -> typename detail::get_generic_visitor_type<FunctionTypes...>::result_type
+auto match(Variant const& variant, FunctionTypes... functions) -> typename detail::get_generic_visitor<FunctionTypes...>::result_type
 {
     return boost::apply_visitor(detail::make_visitor(functions...), variant);
 }
