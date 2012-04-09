@@ -31,34 +31,22 @@ BOOST_AUTO_TEST_CASE(void_return) {
     BOOST_CHECK_EQUAL(result, 1);
 }
 
-struct copy_counter
+struct int_function
 {
-    copy_counter(int * counter) : copy_count_(counter) {}
-    copy_counter(copy_counter const& other) : copy_count_(other.copy_count_)
+    int_function(int * counter) : copy_count_(counter) {}
+    int_function(int_function && other) {}
+    int_function(int_function const& other) : copy_count_(other.copy_count_)
     {
         ++(*copy_count_);
     }
 
     int * copy_count_;
-};
-
-struct int_function : copy_counter
-{
-    int_function(int * counter) : copy_counter(counter) {}
     void operator()(int x) const {}
-};
-
-struct char_function : copy_counter
-{
-    char_function(int * counter) : copy_counter(counter) {}
-    void operator()(char x) const {}
 };
 
 BOOST_AUTO_TEST_CASE(copyable_functions) {
     IntChar v(123);
-    int counter1 = 0;
-    int counter2 = 0;
-    match(v, int_function(&counter1), char_function(&counter2));
-    std::cout << counter1 << std::endl;
-    std::cout << counter2 << std::endl;
+    int counter = 0;
+    match(v, int_function(&counter), [](char){});
+    std::cout << counter << std::endl;
 }

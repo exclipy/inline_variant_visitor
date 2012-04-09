@@ -6,6 +6,7 @@
 #include <boost/fusion/include/make_vector.hpp>
 #include <boost/fusion/include/map.hpp>
 #include <boost/fusion/algorithm/transformation/transform.hpp>
+#include <boost/move/move.hpp>
 #include <boost/mpl/contains.hpp>
 #include <boost/mpl/equal_to.hpp>
 #include <boost/mpl/front.hpp>
@@ -18,6 +19,7 @@
 #include <boost/static_assert.hpp>
 #include <boost/type_traits/is_same.hpp>
 #include <boost/type_traits/remove_reference.hpp>
+#include <boost/utility.hpp>
 
 #include "function_signature.hpp"
 
@@ -69,9 +71,11 @@ struct pair_maker
 // A functor template suitable for passing into apply_visitor.  The constructor accepts the list of handler functions,
 // which are then exposed through a set of operator()s
 template <typename ReturnType, typename... FunctionTypes >
-struct generic_visitor : boost::static_visitor<ReturnType>
+struct generic_visitor : boost::static_visitor<ReturnType>, boost::noncopyable
 {
 private:
+    typedef generic_visitor<ReturnType, FunctionTypes...> type;
+
     // Compute the function_map type
     typedef boost::mpl::vector<FunctionTypes...> function_types;
     typedef typename boost::mpl::transform<function_types, function_arg_extractor>::type variant_types;
@@ -93,7 +97,14 @@ private:
     // Maps from argument type to the runtime function object that can deal with it
     function_map fmap;
 
+    BOOST_MOVABLE_BUT_NOT_COPYABLE(generic_visitor)
+
 public:
+    generic_visitor(BOOST_RV_REF(type) other)
+    :
+        fmap(boost::move(other.fmap))
+    {
+    }
     generic_visitor(FunctionTypes... functions)
     :
         fmap(boost::fusion::as_map(boost::fusion::transform(boost::fusion::make_vector(functions...), pair_maker())))
