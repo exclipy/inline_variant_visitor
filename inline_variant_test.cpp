@@ -48,5 +48,5 @@ BOOST_AUTO_TEST_CASE(copyable_functions) {
     IntChar v(123);
     int counter = 0;
     match(v, int_function(&counter), [](char){});
-    std::cout << counter << std::endl;
+    BOOST_CHECK_EQUAL(counter, 0);
 }

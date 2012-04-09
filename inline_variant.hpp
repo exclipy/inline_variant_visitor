@@ -183,14 +183,14 @@ private:
 
 // Accepts a set of functions and returns an object suitable for apply_visitor
 template <typename... FunctionTypes>
-auto make_visitor(FunctionTypes... functions) -> typename detail::get_generic_visitor<FunctionTypes...>::type {
-    return typename detail::get_generic_visitor<FunctionTypes...>::type(functions...);
+auto make_visitor(FunctionTypes&&... functions) -> typename detail::get_generic_visitor<FunctionTypes...>::type {
+    return typename detail::get_generic_visitor<FunctionTypes...>::type(boost::forward<FunctionTypes>(functions)...);
 }
 
 }
 
 template <typename Variant, typename... FunctionTypes>
-auto match(Variant const& variant, FunctionTypes... functions) -> typename detail::get_generic_visitor<FunctionTypes...>::result_type
+auto match(Variant const& variant, FunctionTypes&&... functions) -> typename detail::get_generic_visitor<FunctionTypes...>::result_type
 {
-    return boost::apply_visitor(detail::make_visitor(functions...), variant);
+    return boost::apply_visitor(detail::make_visitor(boost::forward<FunctionTypes>(functions)...), variant);
 }
