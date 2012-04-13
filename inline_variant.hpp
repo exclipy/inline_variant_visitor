@@ -1,3 +1,4 @@
+#include <boost/utility/enable_if.hpp>
 #include <boost/function_types/function_arity.hpp>
 #include <boost/function_types/parameter_types.hpp>
 #include <boost/function_types/result_type.hpp>
@@ -97,6 +98,16 @@ private:
     // Maps from argument type to the runtime function object that can deal with it
     function_map fmap;
 
+    template <typename T>
+    Return apply_helper(const T& object, boost::mpl::true_) const {
+        return boost::fusion::at_key<T>(fmap)(object);
+    }
+
+    template <typename T>
+    Return apply_helper(const T& object, boost::mpl::false_) const {
+        return Return();
+    }
+
     BOOST_MOVABLE_BUT_NOT_COPYABLE(generic_visitor)
 
 public:
@@ -113,10 +124,10 @@ public:
 
     template <typename T>
     Return operator()(const T& object) const {
-        typedef typename boost::remove_const< typename boost::remove_reference<T>::type >::type bare_type;
-        BOOST_STATIC_ASSERT_MSG((boost::fusion::result_of::has_key<function_map, T>::value),
-                "make_visitor called without specifying handlers for all required types");
-        return boost::fusion::at_key<T>(fmap)(object);
+        typedef typename boost::fusion::result_of::has_key<function_map, T>::type correct_key;
+        BOOST_STATIC_ASSERT_MSG(correct_key::value,
+            "make_visitor called without specifying handlers for all required types");
+        return apply_helper(object, correct_key());
     }
 };
 
