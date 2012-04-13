@@ -28,13 +28,13 @@ namespace detail {
 // A metafunction class for getting the argument type from a unary function or functor type
 struct function_arg_extractor
 {
-    // FunctionType is either a function type like void(int const&), or a functor - eg. a class with void operator(int)
+    // Function is either a function type like void(int const&), or a functor - eg. a class with void operator(int)
     // Sets type to the argument type with the constness and referenceness stripped (eg. int)
-    template <typename FunctionType>
+    template <typename Function>
     struct apply
     {
     private:
-        typedef typename boost::remove_const< typename boost::remove_reference<FunctionType>::type >::type bare_type;
+        typedef typename boost::remove_const< typename boost::remove_reference<Function>::type >::type bare_type;
         typedef typename signature_of<bare_type>::type normalized_function_type;
         typedef typename boost::function_types::function_arity<normalized_function_type>::type arity;
         typedef typename boost::function_types::parameter_types<normalized_function_type>::type parameter_types;
@@ -54,30 +54,30 @@ struct pair_maker
     template<typename Sig>
     struct result;
 
-    template <typename FunctionType>
-    struct result<pair_maker(FunctionType)>
+    template <typename Function>
+    struct result<pair_maker(Function)>
     {
-        typedef typename function_arg_extractor::apply<FunctionType>::type arg_type;
-        typedef boost::fusion::pair<arg_type, FunctionType> type;
+        typedef typename function_arg_extractor::apply<Function>::type arg_type;
+        typedef boost::fusion::pair<arg_type, Function> type;
     };
 
-    template <typename FunctionType>
-    typename result<pair_maker(FunctionType)>::type operator()(FunctionType a) const
+    template <typename Function>
+    typename result<pair_maker(Function)>::type operator()(Function a) const
     {
-        return boost::fusion::make_pair< typename result<pair_maker(FunctionType)>::arg_type >(a);
+        return boost::fusion::make_pair< typename result<pair_maker(Function)>::arg_type >(a);
     }
 };
 
 // A functor template suitable for passing into apply_visitor.  The constructor accepts the list of handler functions,
 // which are then exposed through a set of operator()s
-template <typename ReturnType, typename... FunctionTypes >
-struct generic_visitor : boost::static_visitor<ReturnType>, boost::noncopyable
+template <typename Return, typename... Functions >
+struct generic_visitor : boost::static_visitor<Return>, boost::noncopyable
 {
 private:
-    typedef generic_visitor<ReturnType, FunctionTypes...> type;
+    typedef generic_visitor<Return, Functions...> type;
 
     // Compute the function_map type
-    typedef boost::mpl::vector<FunctionTypes...> function_types;
+    typedef boost::mpl::vector<Functions...> function_types;
     typedef typename boost::mpl::transform<function_types, function_arg_extractor>::type variant_types;
     // Check that the argument types are unique
     typedef typename boost::mpl::fold<
@@ -105,14 +105,14 @@ public:
         fmap(boost::move(other.fmap))
     {
     }
-    generic_visitor(FunctionTypes... functions)
+    generic_visitor(Functions... functions)
     :
         fmap(boost::fusion::as_map(boost::fusion::transform(boost::fusion::make_vector(functions...), pair_maker())))
     {
     }
 
     template <typename T>
-    ReturnType operator()(T object) const {
+    Return operator()(T object) const {
         typedef typename boost::remove_const< typename boost::remove_reference<T>::type >::type bare_type;
         BOOST_STATIC_ASSERT_MSG((boost::fusion::result_of::has_key<function_map, T>::value),
                 "make_visitor called without specifying handlers for all required types");
@@ -123,8 +123,8 @@ public:
 // A metafunction class for getting the return type of a function
 struct function_return_extractor
 {
-    template <typename FunctionType>
-    struct apply : boost::function_types::result_type<typename signature_of<FunctionType>::type>
+    template <typename Function>
+    struct apply : boost::function_types::result_type<typename signature_of<Function>::type>
     {
     };
 };
@@ -147,19 +147,19 @@ struct check_same
 template <typename ResultType>
 struct expand_generic_visitor
 {
-    template <typename... FunctionTypes>
+    template <typename... Functions>
     struct apply
     {
-        typedef generic_visitor<ResultType, FunctionTypes...> type;
+        typedef generic_visitor<ResultType, Functions...> type;
     };
 };
 
-// A metafunction for getting the required generic_visitor type for the set of FunctionTypes
-template <typename... FunctionTypes>
+// A metafunction for getting the required generic_visitor type for the set of Functions
+template <typename... Functions>
 struct get_generic_visitor
 {
 private:
-    typedef boost::mpl::vector<FunctionTypes...> function_types;
+    typedef boost::mpl::vector<Functions...> function_types;
     BOOST_STATIC_ASSERT_MSG((boost::mpl::size<function_types>::value > 0),
             "make_visitor called with no functions");
     typedef typename boost::mpl::transform<
@@ -182,15 +182,15 @@ private:
 };
 
 // Accepts a set of functions and returns an object suitable for apply_visitor
-template <typename... FunctionTypes>
-auto make_visitor(FunctionTypes&&... functions) -> typename detail::get_generic_visitor<FunctionTypes...>::type {
-    return typename detail::get_generic_visitor<FunctionTypes...>::type(boost::forward<FunctionTypes>(functions)...);
+template <typename... Functions>
+auto make_visitor(Functions&&... functions) -> typename detail::get_generic_visitor<Functions...>::type {
+    return typename detail::get_generic_visitor<Functions...>::type(boost::forward<Functions>(functions)...);
 }
 
 }
 
-template <typename Variant, typename... FunctionTypes>
-auto match(Variant const& variant, FunctionTypes&&... functions) -> typename detail::get_generic_visitor<FunctionTypes...>::result_type
+template <typename Variant, typename... Functions>
+auto match(Variant const& variant, Functions&&... functions) -> typename detail::get_generic_visitor<Functions...>::result_type
 {
-    return boost::apply_visitor(detail::make_visitor(boost::forward<FunctionTypes>(functions)...), variant);
+    return boost::apply_visitor(detail::make_visitor(boost::forward<Functions>(functions)...), variant);
 }
