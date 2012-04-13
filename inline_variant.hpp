@@ -160,8 +160,6 @@ struct get_generic_visitor
 {
 private:
     typedef boost::mpl::vector<Functions...> function_types;
-    BOOST_STATIC_ASSERT_MSG((boost::mpl::size<function_types>::value > 0),
-            "make_visitor called with no functions");
     typedef typename boost::mpl::transform<
         function_types,
         boost::remove_const< boost::remove_reference<boost::mpl::_1> >
@@ -189,8 +187,12 @@ auto make_visitor(Functions&&... functions) -> typename detail::get_generic_visi
 
 }
 
-template <typename Variant, typename... Functions>
-auto match(Variant const& variant, Functions&&... functions) -> typename detail::get_generic_visitor<Functions...>::result_type
+// function1 is not part of the parameter pack to require at least one function.
+template <typename Variant, typename Function1, typename... Functions>
+auto match(Variant const& variant, Function1 function1, Functions&&... functions)
+    -> typename detail::get_generic_visitor<Function1, Functions...>::result_type
 {
-    return boost::apply_visitor(detail::make_visitor(boost::forward<Functions>(functions)...), variant);
+    return boost::apply_visitor(detail::make_visitor(
+        boost::forward<Function1>(function1),
+        boost::forward<Functions>(functions)...), variant);
 }

@@ -7,6 +7,8 @@
 
 typedef boost::variant<int, char> IntChar;
 
+typedef boost::variant<int> Int;
+
 int run_visitor(IntChar const& variant)
 {
     int ret = match(variant,
@@ -20,6 +22,12 @@ BOOST_AUTO_TEST_CASE(visit_primitives) {
     BOOST_CHECK_EQUAL(run_visitor(v), 123);
     v = 'c';
     BOOST_CHECK_EQUAL(run_visitor(v), static_cast<int>('c')+3);
+}
+
+BOOST_AUTO_TEST_CASE(visit_one) {
+    Int v(123);
+    int ret = match(v, [](int x) { return x+1; });
+    BOOST_CHECK_EQUAL(ret, 124);
 }
 
 BOOST_AUTO_TEST_CASE(void_return) {
