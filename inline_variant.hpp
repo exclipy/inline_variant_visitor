@@ -112,7 +112,7 @@ public:
     }
 
     template <typename T>
-    Return operator()(T object) const {
+    Return operator()(const T& object) const {
         typedef typename boost::remove_const< typename boost::remove_reference<T>::type >::type bare_type;
         BOOST_STATIC_ASSERT_MSG((boost::fusion::result_of::has_key<function_map, T>::value),
                 "make_visitor called without specifying handlers for all required types");
@@ -187,7 +187,6 @@ auto make_visitor(Functions&&... functions) -> typename detail::get_generic_visi
 
 }
 
-// function1 is not part of the parameter pack to require at least one function.
 template <typename Variant, typename Function1, typename... Functions>
 auto match(Variant const& variant, Function1 function1, Functions&&... functions)
     -> typename detail::get_generic_visitor<Function1, Functions...>::result_type
