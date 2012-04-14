@@ -71,11 +71,11 @@ struct pair_maker
 
 // A functor template suitable for passing into apply_visitor.  The constructor accepts the list of handler functions,
 // which are then exposed through a set of operator()s
-template <typename Return, typename... Functions >
-struct generic_visitor : boost::static_visitor<Return>, boost::noncopyable
+template <typename Result, typename... Functions >
+struct generic_visitor : boost::static_visitor<Result>, boost::noncopyable
 {
 private:
-    typedef generic_visitor<Return, Functions...> type;
+    typedef generic_visitor<Result, Functions...> type;
 
     // Compute the function_map type
     typedef boost::mpl::vector<Functions...> function_types;
@@ -99,13 +99,13 @@ private:
     function_map fmap;
 
     template <typename T>
-    Return apply_helper(const T& object, boost::mpl::true_) const {
+    Result apply_helper(const T& object, boost::mpl::true_) const {
         return boost::fusion::at_key<T>(fmap)(object);
     }
 
     template <typename T>
-    Return apply_helper(const T& object, boost::mpl::false_) const {
-        return Return();
+    Result apply_helper(const T& object, boost::mpl::false_) const {
+        return Result();
     }
 
     BOOST_MOVABLE_BUT_NOT_COPYABLE(generic_visitor)
@@ -123,7 +123,7 @@ public:
     }
 
     template <typename T>
-    Return operator()(const T& object) const {
+    Result operator()(const T& object) const {
         typedef typename boost::fusion::result_of::has_key<function_map, T>::type correct_key;
         BOOST_STATIC_ASSERT_MSG(correct_key::value,
             "make_visitor called without specifying handlers for all required types");
@@ -155,13 +155,13 @@ struct check_same
 };
 
 // A metafunction template helper
-template <typename ResultType>
+template <typename Result>
 struct expand_generic_visitor
 {
     template <typename... Functions>
     struct apply
     {
-        typedef generic_visitor<ResultType, Functions...> type;
+        typedef generic_visitor<Result, Functions...> type;
     };
 };
 
@@ -192,14 +192,14 @@ private:
 
 // Accepts a set of functions and returns an object suitable for apply_visitor
 template <typename... Functions>
-auto make_visitor(Functions&&... functions) -> typename detail::get_generic_visitor<Functions...>::type {
+auto make_visitor(BOOST_RV_REF(Functions)... functions) -> typename detail::get_generic_visitor<Functions...>::type {
     return typename detail::get_generic_visitor<Functions...>::type(boost::forward<Functions>(functions)...);
 }
 
 }
 
 template <typename Variant, typename Function1, typename... Functions>
-auto match(Variant const& variant, Function1 function1, Functions&&... functions)
+auto match(Variant const& variant, Function1 function1, BOOST_RV_REF(Functions)... functions)
     -> typename detail::get_generic_visitor<Function1, Functions...>::result_type
 {
     return boost::apply_visitor(detail::make_visitor(
