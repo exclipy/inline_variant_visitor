@@ -1,3 +1,4 @@
+#pragma once
 // Pasted from http://stackoverflow.com/questions/4771417/how-to-get-the-signature-of-a-c-bind-expression
 
 #include <boost/mpl/pop_front.hpp>

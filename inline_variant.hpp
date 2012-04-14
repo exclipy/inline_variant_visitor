@@ -1,3 +1,5 @@
+#pragma once
+
 #include <boost/utility/enable_if.hpp>
 #include <boost/function_types/function_arity.hpp>
 #include <boost/function_types/parameter_types.hpp>
