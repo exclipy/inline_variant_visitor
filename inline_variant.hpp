@@ -69,27 +69,46 @@ struct pair_maker
     }
 };
 
+// A metafunction class that asserts the second argument is in Allowed, and returns void
+template<typename Allowed>
+struct check_in
+{
+    template <typename Type1, typename Type2>
+    struct apply
+    {
+    private:
+        BOOST_STATIC_ASSERT_MSG((boost::mpl::contains<Allowed, Type2>::value),
+                "make_visitor called with spurious handler functions");
+    public:
+        typedef void type;
+    };
+};
+
 // A functor template suitable for passing into apply_visitor.  The constructor accepts the list of handler functions,
 // which are then exposed through a set of operator()s
-template <typename Result, typename... Functions >
+template <typename Result, typename Variant, typename... Functions>
 struct generic_visitor : boost::static_visitor<Result>, boost::noncopyable
 {
 private:
-    typedef generic_visitor<Result, Functions...> type;
+    typedef generic_visitor<Result, Variant, Functions...> type;
 
     // Compute the function_map type
     typedef boost::mpl::vector<Functions...> function_types;
-    typedef typename boost::mpl::transform<function_types, function_arg_extractor>::type variant_types;
+    typedef typename boost::mpl::transform<function_types, function_arg_extractor>::type arg_types;
     // Check that the argument types are unique
     typedef typename boost::mpl::fold<
-        variant_types,
+        arg_types,
         boost::mpl::set0<>,
-        boost::mpl::insert<boost::mpl::_1,boost::mpl::_2>
-    >::type variant_types_set;
-    BOOST_STATIC_ASSERT_MSG((boost::mpl::size<variant_types_set>::value == boost::mpl::size<variant_types>::value),
+        boost::mpl::insert<boost::mpl::_1, boost::mpl::_2>
+    >::type arg_types_set;
+    BOOST_STATIC_ASSERT_MSG((boost::mpl::size<arg_types_set>::value == boost::mpl::size<arg_types>::value),
             "make_visitor called with non-unique argument types for handler functions");
+
+    // Check that there aren't any argument types not in the variant types
+    typedef typename boost::mpl::fold<arg_types, void, check_in<typename Variant::types> >::type dummy;
+
     typedef typename boost::mpl::transform<
-        variant_types,
+        arg_types,
         function_types,
         boost::fusion::result_of::make_pair<boost::mpl::_1, boost::mpl::_2>
     >::type pair_list;
@@ -155,18 +174,18 @@ struct check_same
 };
 
 // A metafunction template helper
-template <typename Result>
+template <typename Result, typename Variant>
 struct expand_generic_visitor
 {
     template <typename... Functions>
     struct apply
     {
-        typedef generic_visitor<Result, Functions...> type;
+        typedef generic_visitor<Result, Variant, Functions...> type;
     };
 };
 
 // A metafunction for getting the required generic_visitor type for the set of Functions
-template <typename... Functions>
+template <typename Variant, typename... Functions>
 struct get_generic_visitor
 {
 private:
@@ -182,7 +201,7 @@ public:
     typedef typename boost::mpl::front<return_types>::type result_type;
 
     typedef typename boost::mpl::unpack_args<
-        expand_generic_visitor<result_type>
+        expand_generic_visitor<result_type, Variant>
     >::template apply<bare_function_types>::type type;
 
 private:
@@ -191,18 +210,20 @@ private:
 };
 
 // Accepts a set of functions and returns an object suitable for apply_visitor
-template <typename... Functions>
-auto make_visitor(BOOST_RV_REF(Functions)... functions) -> typename detail::get_generic_visitor<Functions...>::type {
-    return typename detail::get_generic_visitor<Functions...>::type(boost::forward<Functions>(functions)...);
+template <typename Variant, typename... Functions>
+auto make_visitor(BOOST_RV_REF(Functions)... functions)
+    -> typename detail::get_generic_visitor<Variant, Functions...>::type
+{
+    return typename detail::get_generic_visitor<Variant, Functions...>::type(boost::forward<Functions>(functions)...);
 }
 
 }
 
 template <typename Variant, typename Function1, typename... Functions>
 auto match(Variant const& variant, Function1 function1, BOOST_RV_REF(Functions)... functions)
-    -> typename detail::get_generic_visitor<Function1, Functions...>::result_type
+    -> typename detail::get_generic_visitor<Variant, Function1, Functions...>::result_type
 {
-    return boost::apply_visitor(detail::make_visitor(
+    return boost::apply_visitor(detail::make_visitor<Variant>(
         boost::forward<Function1>(function1),
         boost::forward<Functions>(functions)...), variant);
 }

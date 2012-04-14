@@ -17,20 +17,23 @@ int run_visitor(IntChar const& variant)
     return ret;
 }
 
-BOOST_AUTO_TEST_CASE(visit_primitives) {
+BOOST_AUTO_TEST_CASE(visit_primitives)
+{
     IntChar v(123);
     BOOST_CHECK_EQUAL(run_visitor(v), 123);
     v = 'c';
     BOOST_CHECK_EQUAL(run_visitor(v), static_cast<int>('c')+3);
 }
 
-BOOST_AUTO_TEST_CASE(visit_one) {
+BOOST_AUTO_TEST_CASE(visit_one)
+{
     Int v(123);
     int ret = match(v, [](int x) { return x+1; });
     BOOST_CHECK_EQUAL(ret, 124);
 }
 
-BOOST_AUTO_TEST_CASE(void_return) {
+BOOST_AUTO_TEST_CASE(void_return)
+{
     IntChar v(123);
     int result = 0;
     match(v,
@@ -64,14 +67,16 @@ struct int_function : copy_counter
     void operator()(int x) const {}
 };
 
-BOOST_AUTO_TEST_CASE(copyable_functions) {
+BOOST_AUTO_TEST_CASE(copyable_functions)
+{
     IntChar v(123);
     int counter = 0;
     match(v, int_function(&counter), [](char){});
     BOOST_CHECK_EQUAL(counter, 0);
 }
 
-BOOST_AUTO_TEST_CASE(dont_copy_value) {
+BOOST_AUTO_TEST_CASE(dont_copy_value)
+{
     int counter = 0;
     boost::variant<copy_counter> v;
     v = copy_counter(&counter);
