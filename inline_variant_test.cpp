@@ -53,6 +53,7 @@ struct copy_counter
     copy_counter& operator=(copy_counter const& other) {
         copy_count_ = other.copy_count_;
         ++(*copy_count_);
+        return *this;
     }
 
     int * copy_count_;
